@@ -158,6 +158,36 @@ Each group has its own independent mode.
 
 ---
 
+## Persistent Session (Recommended for Cloud)
+
+By default the WhatsApp session is stored on the local filesystem. On cloud platforms like Railway the filesystem is wiped on every redeploy, requiring a new QR scan each time.
+
+To persist the session across restarts using a **free private GitHub Gist**:
+
+### 1 — Create a GitHub Personal Access Token
+1. Go to **GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)**
+2. Click **"Generate new token (classic)"**
+3. Give it a name (e.g. "whatsapp-bot-session")
+4. Check the **`gist`** scope only
+5. Click **"Generate token"** and copy it
+
+### 2 — Create a Private Gist
+1. Go to **[gist.github.com](https://gist.github.com)**
+2. Create a new gist — content doesn't matter, just put any text
+3. Make sure **"Secret gist"** is selected
+4. Click **"Create secret gist"**
+5. Copy the Gist ID from the URL: `gist.github.com/{username}/`**`THIS_PART`**
+
+### 3 — Add to Environment Variables
+```env
+GITHUB_TOKEN=ghp_xxxxxxxxxxxx
+GIST_ID=abc123def456
+```
+
+The bot will automatically save and restore the session from the Gist. Each user sets up their own token and Gist — sessions are never shared.
+
+---
+
 ## Configuration
 
 All configuration is done via the `.env` file:
@@ -165,6 +195,8 @@ All configuration is done via the `.env` file:
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `GEMINI_API_KEY` | Yes | — | Your Google Gemini API key |
+| `GITHUB_TOKEN` | No | — | GitHub token with `gist` scope (for session persistence) |
+| `GIST_ID` | No | — | ID of your private GitHub Gist |
 
 ---
 

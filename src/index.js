@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const { useGistAuthState } = require('./gistSessionStore');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const QRCode = require('qrcode');
 const path = require('path');
@@ -110,7 +111,9 @@ async function askGemini(groupId, senderName, text) {
 
 // ── WhatsApp connection ───────────────────────────────
 async function connect() {
-  const { state, saveCreds } = await useMultiFileAuthState('auth_session');
+  const { state, saveCreds } = (process.env.GITHUB_TOKEN && process.env.GIST_ID)
+    ? await useGistAuthState()
+    : await useMultiFileAuthState('auth_session');
   const { version } = await fetchLatestBaileysVersion();
 
   const sock = makeWASocket({
