@@ -153,27 +153,33 @@ async function connect() {
       console.log(`✓ Bot number: ${botNumber}`);
       console.log('✓ @mention the bot in any group to trigger it.\n');
 
-      // Auto-discover LID from group participant lists
+      // Auto-discover LID from credentials or group participant lists
       if (!botLid) {
-        setTimeout(async () => {
-          try {
-            const groups = await sock.groupFetchAllParticipating();
-            for (const group of Object.values(groups)) {
-              for (const p of group.participants) {
-                const pNum = p.id.split(':')[0].split('@')[0];
-                if (pNum === botNumber && p.lid) {
-                  botLid = p.lid;
+        // Try credentials first
+        const credsLid = sock.authState?.creds?.me?.lid;
+        if (credsLid) {
+          botLid = credsLid;
+          console.log(`✓ LID from creds: ${botLid.split(':')[0].split('@')[0]}`);
+        } else {
+          setTimeout(async () => {
+            try {
+              const groups = await sock.groupFetchAllParticipating();
+              const firstGroup = Object.values(groups)[0];
+              if (firstGroup) {
+                const me = firstGroup.participants.find(p =>
+                  p.id.split(':')[0].split('@')[0] === botNumber
+                );
+                console.log(`[LID DEBUG] My participant entry: ${JSON.stringify(me)}`);
+                if (me?.lid) {
+                  botLid = me.lid;
                   console.log(`✓ Auto-discovered LID: ${botLid.split(':')[0].split('@')[0]}`);
-                  break;
                 }
               }
-              if (botLid) break;
+            } catch (e) {
+              console.log('[LID DEBUG] Error:', e.message);
             }
-            if (!botLid) debug('LID not found in group participants yet');
-          } catch (e) {
-            debug('LID discovery error:', e.message);
-          }
-        }, 3000);
+          }, 3000);
+        }
       }
     }
   });
