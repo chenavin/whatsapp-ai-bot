@@ -148,11 +148,33 @@ async function connect() {
       botJid = sock.user.id;
       botLid = sock.user.lid || '';
       const botNumber = botJid.split(':')[0].split('@')[0];
-      const botLidNumber = botLid.split(':')[0].split('@')[0];
-      if (fs.existsSync(qrPath)) fs.unlinkSync(qrPath); // remove QR after connect
+      if (fs.existsSync(qrPath)) fs.unlinkSync(qrPath);
       console.log('\n✓ Connected to WhatsApp!');
-      console.log(`✓ Bot JID: ${botNumber} | LID: ${botLidNumber}`);
+      console.log(`✓ Bot number: ${botNumber}`);
       console.log('✓ @mention the bot in any group to trigger it.\n');
+
+      // Auto-discover LID from group participant lists
+      if (!botLid) {
+        setTimeout(async () => {
+          try {
+            const groups = await sock.groupFetchAllParticipating();
+            for (const group of Object.values(groups)) {
+              for (const p of group.participants) {
+                const pNum = p.id.split(':')[0].split('@')[0];
+                if (pNum === botNumber && p.lid) {
+                  botLid = p.lid;
+                  console.log(`✓ Auto-discovered LID: ${botLid.split(':')[0].split('@')[0]}`);
+                  break;
+                }
+              }
+              if (botLid) break;
+            }
+            if (!botLid) debug('LID not found in group participants yet');
+          } catch (e) {
+            debug('LID discovery error:', e.message);
+          }
+        }, 3000);
+      }
     }
   });
 
@@ -187,15 +209,6 @@ async function connect() {
       let botLidNumber = botLid?.split(':')[0].split('@')[0];
       const isNamedInText = text.toLowerCase().includes('gemini');
 
-      // Learn our LID if unknown — when text trigger + single @lid mention are used together
-      if (!botLidNumber && isNamedInText) {
-        const lidJids = mentionedJids.filter(j => j.endsWith('@lid'));
-        if (lidJids.length === 1) {
-          botLid = lidJids[0];
-          botLidNumber = botLid.split(':')[0].split('@')[0];
-          console.log(`✓ Learned bot LID: ${botLidNumber}`);
-        }
-      }
 
       const isMentioned = mentionedJids.some(jid => {
         const n = jid.split(':')[0].split('@')[0];
