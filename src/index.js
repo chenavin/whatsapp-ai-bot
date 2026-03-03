@@ -3,7 +3,23 @@ const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLat
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const QRCode = require('qrcode');
 const path = require('path');
+const http = require('http');
+const fs = require('fs');
 const pino = require('pino');
+
+// ── QR web server (needed for cloud deployment) ───────
+const PORT = process.env.PORT || 3000;
+const qrPath = path.join(__dirname, '..', 'qr.png');
+
+http.createServer((req, res) => {
+  if (fs.existsSync(qrPath)) {
+    res.writeHead(200, { 'Content-Type': 'image/png' });
+    fs.createReadStream(qrPath).pipe(res);
+  } else {
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end('<h1>✓ Bot is connected to WhatsApp</h1><p>No QR code needed — already linked.</p>');
+  }
+}).listen(PORT, () => console.log(`Server on port ${PORT}`));
 
 // ── Gemini setup ──────────────────────────────────────
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -109,12 +125,11 @@ async function connect() {
   // ── Connection state ────────────────────────────────
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
     if (qr) {
-      const qrPath = path.join(__dirname, '..', 'qr.png');
       await QRCode.toFile(qrPath, qr, { width: 400, margin: 2 });
-      console.clear();
       console.log('─────────────────────────────────────────');
-      console.log('  QR code saved! Open this file and scan:');
-      console.log(`  ${qrPath}`);
+      console.log('  Scan the QR code to connect WhatsApp:');
+      console.log(`  Local:  ${qrPath}`);
+      console.log(`  Cloud:  visit your deployment URL`);
       console.log('  Settings → Linked Devices → Link a Device');
       console.log('─────────────────────────────────────────\n');
     }
@@ -134,6 +149,7 @@ async function connect() {
       botLid = sock.user.lid || '';
       const botNumber = botJid.split(':')[0].split('@')[0];
       const botLidNumber = botLid.split(':')[0].split('@')[0];
+      if (fs.existsSync(qrPath)) fs.unlinkSync(qrPath); // remove QR after connect
       console.log('\n✓ Connected to WhatsApp!');
       console.log(`✓ Bot JID: ${botNumber} | LID: ${botLidNumber}`);
       console.log('✓ @mention the bot in any group to trigger it.\n');
