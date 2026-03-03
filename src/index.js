@@ -184,12 +184,23 @@ async function connect() {
       // Trigger on @mention (by JID) or by name as fallback
       const mentionedJids = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
       const botNumber = botJid?.split(':')[0].split('@')[0];
-      const botLidNumber = botLid?.split(':')[0].split('@')[0];
+      let botLidNumber = botLid?.split(':')[0].split('@')[0];
+      const isNamedInText = text.toLowerCase().includes('gemini');
+
+      // Learn our LID if unknown — when text trigger + single @lid mention are used together
+      if (!botLidNumber && isNamedInText) {
+        const lidJids = mentionedJids.filter(j => j.endsWith('@lid'));
+        if (lidJids.length === 1) {
+          botLid = lidJids[0];
+          botLidNumber = botLid.split(':')[0].split('@')[0];
+          console.log(`✓ Learned bot LID: ${botLidNumber}`);
+        }
+      }
+
       const isMentioned = mentionedJids.some(jid => {
         const n = jid.split(':')[0].split('@')[0];
-        return n === botNumber || n === botLidNumber;
+        return n === botNumber || (botLidNumber && n === botLidNumber);
       });
-      const isNamedInText = text.toLowerCase().includes('gemini');
 
       debug(`text="${text}"`);
       debug(`mentionedJids=${JSON.stringify(mentionedJids)}`);
