@@ -140,7 +140,22 @@ async function connect() {
     if (connection === 'close') {
       const code = lastDisconnect?.error?.output?.statusCode;
       if (code === DisconnectReason.loggedOut) {
-        console.log('\nLogged out. Delete the auth_session folder and restart.');
+        console.log('\nLogged out — clearing session and restarting...');
+        // Clear local session
+        if (fs.existsSync('auth_session')) fs.rmSync('auth_session', { recursive: true });
+        // Clear Gist session
+        if (process.env.GITHUB_TOKEN && process.env.GIST_ID) {
+          const { useGistAuthState } = require('./gistSessionStore');
+          const https = require('https');
+          const body = JSON.stringify({ files: { 'session.json': { content: '{}' } } });
+          const req = https.request({
+            hostname: 'api.github.com', path: `/gists/${process.env.GIST_ID}`,
+            method: 'PATCH',
+            headers: { 'Authorization': `token ${process.env.GITHUB_TOKEN}`, 'User-Agent': 'whatsapp-ai-bot', 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+          });
+          req.write(body); req.end();
+        }
+        setTimeout(connect, 2000);
       } else {
         console.log(`Connection closed (code ${code}), reconnecting...`);
         connect();
