@@ -85,7 +85,7 @@ const HELP_MESSAGE = `*Gemini Bot Commands* 🤖
 @gemini status — Show bot status & session stats
 @gemini help — Show this message
 
-_Just @mention or write "gemini" to ask anything._`;
+_Just @mention, write "gemini", or reply to a bot message to ask anything._`;
 
 // Per-group mode (defaults to normal)
 const groupModes = new Map();
@@ -254,12 +254,18 @@ async function connect() {
         return n === botNumber || (botLidNumber && n === botLidNumber);
       });
 
+      const quotedParticipant = msg.message.extendedTextMessage?.contextInfo?.participant || '';
+      const quotedNumber = quotedParticipant.split(':')[0].split('@')[0];
+      const isReplyToBot = !!quotedNumber && (
+        quotedNumber === botNumber || (botLidNumber && quotedNumber === botLidNumber)
+      );
+
       debug(`text="${text}"`);
       debug(`mentionedJids=${JSON.stringify(mentionedJids)}`);
       debug(`botJid=${botJid} botNumber=${botNumber}`);
-      debug(`isMentioned=${isMentioned} isNamedInText=${isNamedInText}`);
+      debug(`isMentioned=${isMentioned} isNamedInText=${isNamedInText} isReplyToBot=${isReplyToBot}`);
 
-      if (!isMentioned && !isNamedInText) continue;
+      if (!isMentioned && !isNamedInText && !isReplyToBot) continue;
 
       const senderName = msg.pushName || msg.key.participant?.split('@')[0] || 'Someone';
       const cleanText = text.replace(/@\S+/g, '').trim().toLowerCase();
