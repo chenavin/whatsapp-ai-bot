@@ -276,6 +276,7 @@ async function connect() {
 🧠 *Memory (this group):* ${history.length}/20 messages
 🔮 *Model:* gemini-2.5-flash
 🔑 *API Keys:* ${apiKeys.length} configured (using key ${currentKeyIndex + 1})
+🌐 *Server status:* ${process.env.SERVER_URL ? process.env.SERVER_URL + '/status' : 'Set SERVER_URL env var to see link'}
 
 _Note: API quota can only be checked at console.cloud.google.com_`
         }, { quoted: msg });
