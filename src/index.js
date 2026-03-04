@@ -13,6 +13,17 @@ const PORT = process.env.PORT || 3000;
 const qrPath = path.join(__dirname, '..', 'qr.png');
 
 http.createServer((req, res) => {
+  if (req.url === '/status') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      status: 'online',
+      uptime: formatUptime(),
+      messagesHandled: totalMessages,
+      activeKeys: apiKeys.length,
+      currentKey: currentKeyIndex + 1,
+    }));
+    return;
+  }
   if (fs.existsSync(qrPath)) {
     res.writeHead(200, { 'Content-Type': 'image/png' });
     fs.createReadStream(qrPath).pipe(res);
@@ -22,9 +33,20 @@ http.createServer((req, res) => {
   }
 }).listen(PORT, () => console.log(`Server on port ${PORT}`));
 
-// ── Gemini setup ──────────────────────────────────────
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+// ── Gemini setup — multiple keys with fallback ────────
+const GEMINI_MODEL = 'gemini-2.5-flash';
+const apiKeys = [
+  process.env.GEMINI_API_KEY,
+  process.env.GEMINI_API_KEY_2,
+  process.env.GEMINI_API_KEY_3,
+].filter(Boolean);
+
+let currentKeyIndex = 0;
+
+function getModel() {
+  const genAI = new GoogleGenerativeAI(apiKeys[currentKeyIndex]);
+  return genAI.getGenerativeModel({ model: GEMINI_MODEL });
+}
 
 // ── Modes ─────────────────────────────────────────────
 const MODES = {
@@ -102,11 +124,25 @@ async function askGemini(groupId, senderName, text) {
   const prompt = context
     ? `Group chat history:\n${context}\n\nRespond to the latest message.`
     : `${senderName}: ${text}`;
-  const result = await model.generateContent({
-    systemInstruction: mode.instruction,
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-  });
-  return result.response.text().trim();
+
+  // Try each API key, switching on quota errors
+  for (let attempt = 0; attempt < apiKeys.length; attempt++) {
+    try {
+      const result = await getModel().generateContent({
+        systemInstruction: mode.instruction,
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      });
+      return result.response.text().trim();
+    } catch (err) {
+      const isQuota = err.message.includes('429') || err.message.includes('quota');
+      if (isQuota && attempt < apiKeys.length - 1) {
+        currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
+        console.log(`Key ${attempt + 1} quota reached — switching to key ${currentKeyIndex + 1}`);
+        continue;
+      }
+      throw err;
+    }
+  }
 }
 
 // ── WhatsApp connection ───────────────────────────────
@@ -239,6 +275,7 @@ async function connect() {
 📨 *Messages this session:* ${totalMessages}
 🧠 *Memory (this group):* ${history.length}/20 messages
 🔮 *Model:* gemini-2.5-flash
+🔑 *API Keys:* ${apiKeys.length} configured (using key ${currentKeyIndex + 1})
 
 _Note: API quota can only be checked at console.cloud.google.com_`
         }, { quoted: msg });
@@ -283,6 +320,12 @@ _Note: API quota can only be checked at console.cloud.google.com_`
       } catch (err) {
         console.error('Error:', err.message);
         await sock.sendPresenceUpdate('paused', groupId);
+        const isQuota = err.message.includes('429') || err.message.includes('quota');
+        await sock.sendMessage(groupId, {
+          text: isQuota
+            ? '⚠️ API quota reached for today. Try again tomorrow or ask the admin to add more API keys.'
+            : '⚠️ Something went wrong. Please try again.',
+        }, { quoted: msg });
       }
     }
   });
