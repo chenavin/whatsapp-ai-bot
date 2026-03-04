@@ -10,6 +10,8 @@ const pino = require('pino');
 
 // ── QR web server (needed for cloud deployment) ───────
 const PORT = process.env.PORT || 3000;
+const serverUrl = process.env.SERVER_URL ||
+  (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null);
 const qrPath = path.join(__dirname, '..', 'qr.png');
 
 http.createServer((req, res) => {
@@ -276,7 +278,7 @@ async function connect() {
 🧠 *Memory (this group):* ${history.length}/20 messages
 🔮 *Model:* gemini-2.5-flash
 🔑 *API Keys:* ${apiKeys.length} configured (using key ${currentKeyIndex + 1})
-🌐 *Server status:* ${process.env.SERVER_URL ? process.env.SERVER_URL + '/status' : 'Set SERVER_URL env var to see link'}
+🌐 *Server status:* ${serverUrl ? serverUrl + '/status' : 'n/a'}
 
 _Note: API quota can only be checked at console.cloud.google.com_`
         }, { quoted: msg });
